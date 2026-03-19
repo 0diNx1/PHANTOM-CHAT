@@ -364,6 +364,4 @@ sudo ufw enable
 
 ---
 
-## 📝 License
 
-MIT — Educational use. Do not use for illegal activities.
