@@ -1,0 +1,103 @@
+# ── PHANTOM CHAT - Docker Compose ─────────────────────────────────────────────
+# Usage:
+#   Development:  docker-compose up
+#   Production:   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+version: '3.9'
+
+services:
+
+  # ── MongoDB ────────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7-jammy
+    container_name: phantom_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: phantomchat
+      # Uncomment for production auth:
+      # MONGO_INITDB_ROOT_USERNAME: admin
+      # MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    volumes:
+      - mongodb_data:/data/db
+      - ./database/mongo-init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - phantom_net
+    # Don't expose to host in production
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend API + WebSocket ────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: phantom_backend
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      MONGODB_URI: mongodb://mongodb:27017/phantomchat
+      SESSION_SECRET: ${SESSION_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      RATE_LIMIT_WINDOW_MS: 900000
+      RATE_LIMIT_MAX: 100
+      MESSAGE_RATE_LIMIT_MAX: 30
+      DEFAULT_MSG_TTL_HOURS: 24
+      MAX_MSG_TTL_HOURS: 168
+    volumes:
+      - backend_logs:/app/logs
+    networks:
+      - phantom_net
+    expose:
+      - "3001"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Nginx Reverse Proxy ────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: phantom_nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend:/var/www/phantom:ro
+      - nginx_logs:/var/log/nginx
+      # SSL certificates (add your certs here for production)
+      # - ./certs:/etc/nginx/certs:ro
+    networks:
+      - phantom_net
+
+# ── Volumes ────────────────────────────────────────────────────────────────────
+volumes:
+  mongodb_data:
+    driver: local
+  backend_logs:
+    driver: local
+  nginx_logs:
+    driver: local
+
+# ── Networks ───────────────────────────────────────────────────────────────────
+networks:
+  phantom_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

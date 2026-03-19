@@ -105,8 +105,8 @@ User types message
 ### 1. Clone and Setup
 
 ```bash
-git clonehttps://github.com/0diNx1/PHANTOM-CHAT.git
-cd PHANTOM-CHAT
+git clone <your-repo> phantom-chat
+cd phantom-chat
 
 # Install backend dependencies
 cd backend
@@ -364,3 +364,6 @@ sudo ufw enable
 
 ---
 
+## 📝 License
+
+MIT — Educational use. Do not use for illegal activities.
