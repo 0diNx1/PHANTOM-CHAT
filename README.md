@@ -105,8 +105,8 @@ User types message
 ### 1. Clone and Setup
 
 ```bash
-git clone <your-repo> phantom-chat
-cd phantom-chat
+git clonehttps://github.com/0diNx1/PHANTOM-CHAT.git
+cd PHANTOM-CHAT
 
 # Install backend dependencies
 cd backend
